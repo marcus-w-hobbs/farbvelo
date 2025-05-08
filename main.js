@@ -462,15 +462,32 @@ let colors = new Vue({
         )
         .join(",");
     },
+    mirroredGradientStops() {
+      const gradient = [...this.mirroredColors];
+      gradient[0] += " 12vh";
+      gradient[gradient.length - 1] += this.sameHeightColors ? " 80%" : " 69%";
+      return gradient.join(",");
+    },
+    mirroredHardStops() {
+      return this.mirroredColors.map(
+          (c, i) =>
+            `${c} ${(i / this.mirroredColors.length) * 100}% ${
+              ((i + 1) / this.mirroredColors.length) * 100
+            }%`
+        )
+        .join(",");
+    },
     appStyles() {
       return {
         "--color-first": this.firstColor,
         "--color-last": this.lastColor,
         "--color-last-contrast": this.lastColorContrast,
         "--color-first-contrast": this.firstColorContrast,
-        "--colors": this.colors.length,
-        "--gradient": this.gradientStops,
-        "--gradient-hard": this.hardStops,
+        "--colors": this.mirroredColors.length,
+        "--gradient": this.mirroredGradientStops, 
+        "--gradient-hard": this.mirroredHardStops,
+        "--original-gradient": this.gradientStops,
+        "--original-gradient-hard": this.hardStops,
       };
     },
     appClasses() {
@@ -494,14 +511,14 @@ let colors = new Vue({
       };
     },
     namedColorList() {
-      return this.names.map((color) => {
-        const c = chroma(color.requestedHex);
+      return this.mirroredNames.map((color, index) => {
+        const c = chroma(this.mirroredColors[index]);
 
         return {
           name: color.name,
-          value: color.requestedHex,
+          value: this.mirroredColors[index],
           values: {
-            hex: color.requestedHex,
+            hex: this.mirroredColors[index],
             rgb: c.css("rgb"),
             hsl: c.css("hsl"),
             cmyk: c.css("cymk"),
@@ -566,7 +583,7 @@ let colors = new Vue({
       copyExport({
         exportAs: this.exportAs,
         colorList: this.colorList,
-        colors: this.colors,
+        colors: this.mirroredColors,
         lightmode: this.lightmode,
         buildImageFn: buildImage,
         buildSVGFn: buildSVG,
@@ -579,10 +596,10 @@ let colors = new Vue({
       shareURL(this.currentURL);
     },
     buildImage(size = 100, padding = 0.1, hardStops = false) {
-      return buildImage(this.colors, this.lightmode, size, padding, hardStops);
+      return buildImage(this.mirroredColors, this.lightmode, size, padding, hardStops);
     },
     buildSVG(size = 100, padding = 0.1, hardStops = false) {
-      return buildSVG(this.colors, size, padding, hardStops);
+      return buildSVG(this.mirroredColors, size, padding, hardStops);
     },
     getLists() {
       const url = new URL("https://api.color.pizza/v1/lists/");
@@ -630,7 +647,7 @@ let colors = new Vue({
     updateMeta() {
       const theme = document.querySelector('[name="theme-color"]');
       const favicons = document.querySelectorAll('[rel="icon"]');
-      theme.setAttribute("content", this.colors[0]);
+      theme.setAttribute("content", this.mirroredColors[0]);
 
       // Replace favicon
       const faviconBase64 = this.buildImage(100, 0.1).toDataURL("image/png");
