@@ -346,24 +346,15 @@ let colors = new Vue({
       
       if (originalColors.length <= 1) return originalColors;
       
+      // Create first mirror (e.g., 1234321)
       const reversedColors = [...originalColors].slice(0, -1).reverse();
+      const firstMirror = [...originalColors, ...reversedColors];
       
-      let result = [...originalColors, ...reversedColors];
+      // Create second mirror starting from second-to-last element of first mirror
+      // This avoids duplicating the turning point (e.g., 123432|123432)
+      const secondMirror = firstMirror.slice(0, -1);
       
-      if (result.length > 1) {
-        try {
-          const colorDistance = chroma.distance(result[0], result[result.length - 1], 'lab');
-          if (colorDistance < 0.5) {
-            result = result.slice(0, -1);
-          }
-        } catch(e) {
-          if (result[0] === result[result.length - 1]) {
-            result = result.slice(0, -1);
-          }
-        }
-      }
-      
-      return result;
+      return [...firstMirror, ...secondMirror.slice(1)];
     },
     mirroredNames() {
       if (!this.names || !this.names.length) return [];
@@ -372,37 +363,30 @@ let colors = new Vue({
       
       if (originalNames.length <= 1) return originalNames;
       
+      // Create first mirror
       const reversedNames = [...originalNames].slice(0, -1).reverse();
+      const firstMirror = [...originalNames, ...reversedNames];
       
-      let result = [...originalNames, ...reversedNames];
+      // Create second mirror starting from second element to avoid duplication
+      const secondMirror = firstMirror.slice(0, -1);
       
-      if (result.length > 1 && result[0].name === result[result.length - 1].name) {
-        result = result.slice(0, -1);
-      }
-      
-      return result;
+      return [...firstMirror, ...secondMirror.slice(1)];
     },
     mirroredWcagContrastColors() {
-      // Create mirrored version of contrast colors
       if (!this.wcagContrastColors || !this.wcagContrastColors.length) return [];
       
       const originalContrasts = this.wcagContrastColors;
       
       if (originalContrasts.length <= 1) return originalContrasts;
       
-      // For both even and odd arrays, get everything except the last element in reverse
+      // Create first mirror
       const reversedContrasts = [...originalContrasts].slice(0, -1).reverse();
+      const firstMirror = [...originalContrasts, ...reversedContrasts];
       
-      // Combine forward and reversed contrasts
-      let result = [...originalContrasts, ...reversedContrasts];
+      // Create second mirror starting from second element to avoid duplication
+      const secondMirror = firstMirror.slice(0, -1);
       
-      // Remove the last element if it's identical to the first (for perfect looping)
-      // For contrast colors, we need to compare arrays deeply
-      if (result.length > 1 && JSON.stringify(result[0]) === JSON.stringify(result[result.length - 1])) {
-        result = result.slice(0, -1);
-      }
-      
-      return result;
+      return [...firstMirror, ...secondMirror.slice(1)];
     },
     wcagContrastColors() {
       return this.colors.map((color) =>
