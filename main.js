@@ -37,6 +37,15 @@ Vue.component('color', {
                   <li>{{ valueCMYK }}</li>
                 </ol>
               </section>
+              <h3 class="color__name">{{ name && name.name }}</h3>
+              <div class="color__values">
+                <var class="color__value" v-html="value"></var>
+                <section class="color__contrasts" v-if="hasWCAGColorPairs" aria-label="good contrast colors">
+                  <ol>
+                    <li v-for="c in contrastcolors" v-if="c" :key="c" :style="{'--paircolor': c}"><var>{{c}}</var></li>
+                  </ol>
+                </section>
+              </div>
             </aside>`,
 
   methods: {
@@ -321,6 +330,47 @@ let colors = new Vue({
     },
     firstColorContrast() {
       return chroma(this.firstColor).luminance() < 0.5 ? "#fff" : "#212121";
+    },
+    mirroredColors() {
+      // Create a mirror array with unique middle element
+      if (!this.colors || !this.colors.length) return [];
+      
+      const originalColors = this.colors;
+      
+      if (originalColors.length <= 1) return originalColors;
+      
+      // For both even and odd arrays, get everything except the last element in reverse
+      const reversedColors = [...originalColors].slice(0, -1).reverse();
+      
+      // Combine forward and reversed colors
+      return [...originalColors, ...reversedColors];
+    },
+    mirroredNames() {
+      if (!this.names || !this.names.length) return [];
+      
+      const originalNames = this.names;
+      
+      if (originalNames.length <= 1) return originalNames;
+      
+      // For both even and odd arrays, get everything except the last element in reverse
+      const reversedNames = [...originalNames].slice(0, -1).reverse();
+      
+      // Combine forward and reversed names
+      return [...originalNames, ...reversedNames];
+    },
+    mirroredWcagContrastColors() {
+      // Create mirrored version of contrast colors
+      if (!this.wcagContrastColors || !this.wcagContrastColors.length) return [];
+      
+      const originalContrasts = this.wcagContrastColors;
+      
+      if (originalContrasts.length <= 1) return originalContrasts;
+      
+      // For both even and odd arrays, get everything except the last element in reverse
+      const reversedContrasts = [...originalContrasts].slice(0, -1).reverse();
+      
+      // Combine forward and reversed contrasts
+      return [...originalContrasts, ...reversedContrasts];
     },
     colors() {
       let colors;
