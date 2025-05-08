@@ -239,9 +239,18 @@ let colors = new Vue({
       },
       deep: true,
     },
+    mirroredColors: {
+      handler: function(newColors) {
+        if (this.mirroredNames && this.mirroredNames.length !== newColors.length) {
+          console.log("Re-syncing mirrored arrays lengths");
+          this.mirroredNames;
+          this.mirroredWcagContrastColors;
+        }
+      },
+      deep: false
+    },
     trackSettingsInURL: function (newValue, oldValue) {
       if (newValue === false) {
-        //remove the settings from the url
         history.pushState(
           history.state,
           document.title,
@@ -310,7 +319,6 @@ let colors = new Vue({
       this.updateMeta();
     },
     nameList: function () {
-      // When the nameList changes, fetch names for the current colors with the new list
       if (this.colorsValues && this.colorsValues.length) {
         this.getNames(this.colors);
       }
@@ -332,18 +340,30 @@ let colors = new Vue({
       return chroma(this.firstColor).luminance() < 0.5 ? "#fff" : "#212121";
     },
     mirroredColors() {
-      // Create a mirror array with unique middle element
       if (!this.colors || !this.colors.length) return [];
       
       const originalColors = this.colors;
       
       if (originalColors.length <= 1) return originalColors;
       
-      // For both even and odd arrays, get everything except the last element in reverse
       const reversedColors = [...originalColors].slice(0, -1).reverse();
       
-      // Combine forward and reversed colors
-      return [...originalColors, ...reversedColors];
+      let result = [...originalColors, ...reversedColors];
+      
+      if (result.length > 1) {
+        try {
+          const colorDistance = chroma.distance(result[0], result[result.length - 1], 'lab');
+          if (colorDistance < 0.5) {
+            result = result.slice(0, -1);
+          }
+        } catch(e) {
+          if (result[0] === result[result.length - 1]) {
+            result = result.slice(0, -1);
+          }
+        }
+      }
+      
+      return result;
     },
     mirroredNames() {
       if (!this.names || !this.names.length) return [];
@@ -352,11 +372,15 @@ let colors = new Vue({
       
       if (originalNames.length <= 1) return originalNames;
       
-      // For both even and odd arrays, get everything except the last element in reverse
       const reversedNames = [...originalNames].slice(0, -1).reverse();
       
-      // Combine forward and reversed names
-      return [...originalNames, ...reversedNames];
+      let result = [...originalNames, ...reversedNames];
+      
+      if (result.length > 1 && result[0].name === result[result.length - 1].name) {
+        result = result.slice(0, -1);
+      }
+      
+      return result;
     },
     mirroredWcagContrastColors() {
       // Create mirrored version of contrast colors
@@ -370,72 +394,15 @@ let colors = new Vue({
       const reversedContrasts = [...originalContrasts].slice(0, -1).reverse();
       
       // Combine forward and reversed contrasts
-      return [...originalContrasts, ...reversedContrasts];
-    },
-    colors() {
-      let colors;
-
-      if (
-        this.interpolationColorModel === "spectral" &&
-        this.colorsValues.length < this.amount
-      ) {
-        // define the original array of X colors
-        const xColors = [...this.colorsValues];
-
-        // define the desired length of the new array
-        const yLength = this.amount;
-
-        // calculate the number of gaps between colors
-        const numGaps = xColors.length - 1;
-
-        // calculate the spacing between intermediate colors
-        const spacing = numGaps > 0 ? (yLength - 2) / numGaps : 0;
-
-        // create the new array of Y colors
-        const yColors = new Array(yLength);
-
-        // set the first color in the new array to match X
-        yColors[0] = xColors[0];
-
-        // compute the intermediate colors using spectral mixing
-        let yIndex = 1;
-        for (let i = 0; i < numGaps; i++) {
-          const color1 = xColors[i];
-          const color2 = xColors[i + 1];
-          const gapLength = spacing + 1;
-          for (let j = 1; j <= gapLength; j++) {
-            const mixRatio = j / gapLength;
-            const mixedColor = spectral.mix(color1, color2, mixRatio);
-            yColors[yIndex] = mixedColor;
-            yIndex++;
-          }
-        }
-
-        // set the last color in the new array to match X
-        yColors[yLength - 1] = xColors[xColors.length - 1];
-        colors = chroma
-          .scale(yColors)
-          .padding(parseFloat(this.padding))
-          .colors(this.amount);
-      } else {
-        colors = chroma
-          .scale(
-            this.colorsValues.length ? this.colorsValues : ["#202124", "#fff"]
-          )
-          .padding(parseFloat(this.padding))
-          .mode(
-            this.interpolationColorModel !== "spectral"
-              ? this.interpolationColorModel
-              : "lch"
-          )
-          .colors(this.amount);
+      let result = [...originalContrasts, ...reversedContrasts];
+      
+      // Remove the last element if it's identical to the first (for perfect looping)
+      // For contrast colors, we need to compare arrays deeply
+      if (result.length > 1 && JSON.stringify(result[0]) === JSON.stringify(result[result.length - 1])) {
+        result = result.slice(0, -1);
       }
-
-      this.getNames(colors);
-
-      logColors(colors);
-
-      return colors;
+      
+      return result;
     },
     wcagContrastColors() {
       return this.colors.map((color) =>
@@ -464,18 +431,26 @@ let colors = new Vue({
     },
     mirroredGradientStops() {
       const gradient = [...this.mirroredColors];
+      if (gradient.length < 2) return gradient.join(',');
+      
       gradient[0] += " 12vh";
-      gradient[gradient.length - 1] += this.sameHeightColors ? " 80%" : " 69%";
+      
+      const lastIndex = gradient.length - 1;
+      gradient[lastIndex] += this.sameHeightColors ? " 80%" : " 69%";
+      
       return gradient.join(",");
     },
     mirroredHardStops() {
-      return this.mirroredColors.map(
-          (c, i) =>
-            `${c} ${(i / this.mirroredColors.length) * 100}% ${
-              ((i + 1) / this.mirroredColors.length) * 100
-            }%`
-        )
-        .join(",");
+      const colors = this.mirroredColors;
+      if (colors.length < 2) return "";
+      
+      return colors.map(
+        (c, i) => {
+          const start = (i / colors.length) * 100;
+          const end = ((i + 1) / colors.length) * 100;
+          return `${c} ${start}% ${end}%`;
+        }
+      ).join(",");
     },
     appStyles() {
       return {
@@ -566,6 +541,72 @@ let colors = new Vue({
     currentURL() {
       return window.location.origin + "/?s=" + this.constructURL();
     },
+    colors() {
+      let colors;
+
+      if (
+        this.interpolationColorModel === "spectral" &&
+        this.colorsValues.length < this.amount
+      ) {
+        // define the original array of X colors
+        const xColors = [...this.colorsValues];
+
+        // define the desired length of the new array
+        const yLength = this.amount;
+
+        // calculate the number of gaps between colors
+        const numGaps = xColors.length - 1;
+
+        // calculate the spacing between intermediate colors
+        const spacing = numGaps > 0 ? (yLength - 2) / numGaps : 0;
+
+        // create the new array of Y colors
+        const yColors = new Array(yLength);
+
+        // set the first color in the new array to match X
+        yColors[0] = xColors[0];
+
+        // compute the intermediate colors using spectral mixing
+        let yIndex = 1;
+        for (let i = 0; i < numGaps; i++) {
+          const color1 = xColors[i];
+          const color2 = xColors[i + 1];
+          const gapLength = spacing + 1;
+          for (let j = 1; j <= gapLength; j++) {
+            const mixRatio = j / gapLength;
+            const mixedColor = spectral.mix(color1, color2, mixRatio);
+            yColors[yIndex] = mixedColor;
+            yIndex++;
+          }
+        }
+
+        // set the last color in the new array to match X
+        yColors[yLength - 1] = xColors[xColors.length - 1];
+        colors = chroma
+          .scale(yColors)
+          .padding(parseFloat(this.padding))
+          .colors(this.amount);
+      } else {
+        colors = chroma
+          .scale(
+            this.colorsValues.length ? this.colorsValues : ["#202124", "#fff"]
+          )
+          .padding(parseFloat(this.padding))
+          .mode(
+            this.interpolationColorModel !== "spectral"
+              ? this.interpolationColorModel
+              : "lch"
+          )
+          .colors(this.amount);
+      }
+
+      // Only get names for the original colors, not the mirrored ones
+      this.getNames(colors);
+
+      logColors(colors);
+
+      return colors;
+    },
   },
   methods: {
     random(min = 1, max) {
@@ -610,7 +651,6 @@ let colors = new Vue({
       })
         .then((data) => data.json())
         .then((data) => {
-          // some of the lists have to little names, remove all that have less than 100
           const listsToKeep = {};
           Object.keys(data.listDescriptions).forEach((key) => {
             if (data.listDescriptions[key].colorCount > 150) {
@@ -628,8 +668,6 @@ let colors = new Vue({
         list: this.nameList,
         values: colors.map((c) => c.replace("#", "")),
       };
-
-      //url.pathname += colors.join().replace(/#/g, '');
 
       url.search = new URLSearchParams(params).toString();
 
@@ -649,12 +687,10 @@ let colors = new Vue({
       const favicons = document.querySelectorAll('[rel="icon"]');
       theme.setAttribute("content", this.mirroredColors[0]);
 
-      // Replace favicon
       const faviconBase64 = this.buildImage(100, 0.1).toDataURL("image/png");
       favicons.forEach(($icon) => ($icon.href = faviconBase64));
     },
     settingsFromURLAndLocalStorage() {
-      // 1. Load all settings from localStorage (trackInLocalStorage)
       const savedSettingsString = localStorage.getItem("farbveloSettings");
       let mergedSettings = {};
       if (savedSettingsString) {
@@ -671,7 +707,6 @@ let colors = new Vue({
         }
       }
 
-      // 2. Load settings from URL (trackInURL) and overwrite mergedSettings
       const params = window.location.search;
       const stateString = new URLSearchParams(params).get("s");
       let hadSettingsFromURL = false;
@@ -688,27 +723,22 @@ let colors = new Vue({
                 : urlSettings[settingKey];
             }
           });
-          // side effects :(
           this.animateBackgroundIntro = !!urlSettings.hb;
           hadSettingsFromURL = true;
         } catch (e) {
           console.error("Error restoring settings from URL:", e);
-          // Continue with whatever settings we have from localStorage or defaults
         }
       }
 
-      // 2.5. If lightmode is not defined, use system preference
       if (typeof mergedSettings.lightmode === 'undefined') {
         const wantLightMode = window.matchMedia("(prefers-color-scheme: light)");
         mergedSettings.lightmode = wantLightMode.matches;
       }
 
-      // 3. Apply merged settings to Vue instance
       Object.keys(mergedSettings).forEach((prop) => {
         this[prop] = mergedSettings[prop];
       });
 
-      // 4. Save merged settings back to localStorage
       this.saveSettingsToLocalStorage();
 
       return hadSettingsFromURL;
@@ -725,10 +755,7 @@ let colors = new Vue({
     },
     updateURL() {
       if (this.trackSettingsInURL) {
-        // Use pushState instead of directly modifying history.pushState
-        // to add a new entry to the browser's history stack
         const newURL = "?s=" + this.constructURL();
-        // Only add to history if the URL actually changed
         if (window.location.search !== newURL) {
           history.pushState(
             { seed: this.currentSeed, settings: this.constructURL() },
@@ -737,7 +764,7 @@ let colors = new Vue({
           );
         }
       }
-      this.saveSettingsToLocalStorage(); // Save settings when URL is updated
+      this.saveSettingsToLocalStorage();
     },
     newColors(newSeed) {
       document.documentElement.classList.remove("is-imagefetching");
@@ -759,8 +786,6 @@ let colors = new Vue({
         });
         this.colorsValues = colorArr;
       } else if (this.generatorFunction === "ImageExtract") {
-        // Always use a random image when using ImageExtract
-        // This ensures uploaded images are not tracked in the URL
         const imgSrc = `https://picsum.photos/seed/${this.currentSeed}/${
           325 * 2
         }/${483 * 2}`;
@@ -777,7 +802,6 @@ let colors = new Vue({
       }
     },
     resetSettings() {
-      // restore all settings set in defaultSettings
       Object.keys(defaultSettings).forEach((key) => {
         this[key] = defaultSettings[key];
       });
@@ -811,7 +835,6 @@ let colors = new Vue({
     },
     addMagicControls() {
       document.addEventListener("keydown", (e) => {
-        // Skip if any modifier key is pressed to avoid interfering with system shortcuts
         if (e.metaKey || e.ctrlKey) {
           return;
         }
@@ -833,7 +856,6 @@ let colors = new Vue({
       let isTouching = false;
       let lastX = 0;
 
-      // maybe add swipe controls at some point
       document.addEventListener("pointerdown", (e) => {
         isTouching = true;
         lastX = e.clientX;
@@ -876,7 +898,6 @@ let colors = new Vue({
     processImageSource(src) {
       const srcimg = new Image();
       srcimg.onload = () => {
-        // Set imgURL to display the image in the UI
         this.imgURL = src;
         loadImage(
           this,
@@ -920,7 +941,6 @@ let colors = new Vue({
           });
 
           if (settingsApplied) {
-            // Apply side-effects for loaded settings
             if (this.lightmode) {
               document.querySelector("body").classList.add("lightmode");
             } else {
@@ -941,27 +961,22 @@ let colors = new Vue({
   mounted() {
     this.getLists();
     let hadSettingsFromURL = this.settingsFromURLAndLocalStorage();
-    const settingsActuallyLoaded = true; // always loaded something (defaults if nothing else)
+    const settingsActuallyLoaded = true;
 
-    // Remove URL if settings came from it and not tracking in URL
     if (hadSettingsFromURL && !this.trackSettingsInURL) {
       window.history.replaceState({}, document.title, location.pathname);
     }
 
-    // Add popstate event listener to handle browser back/forward buttons
     window.addEventListener('popstate', (event) => {
-      // Handle state restoration when the user navigates through browser history
       if (event.state && event.state.seed) {
         this.currentSeed = event.state.seed;
 
-        // If we have settings in the state, restore them
         if (event.state.settings) {
           try {
             let urlSettings = JSON.parse(
               Buffer.from(event.state.settings, 'base64').toString('ascii')
             );
 
-            // Apply the settings from history state
             this.trackInURL.forEach((setting) => {
               if (urlSettings[setting.key]) {
                 this[setting.prop] = setting.p
@@ -970,15 +985,13 @@ let colors = new Vue({
               }
             });
 
-            // Regenerate colors with the restored seed
             this.rnd = new Seedrandom(this.currentSeed);
-            this.newColors(false); // false because we're restoring, not creating a new seed
+            this.newColors(false);
           } catch (e) {
             console.error('Error restoring settings from history state:', e);
           }
         }
       } else {
-        // If no state (e.g., user navigated to base URL), reset to defaults
         if (!window.location.search) {
           this.resetSettings();
           this.newColors(true);
@@ -1029,7 +1042,6 @@ let colors = new Vue({
     this.newColors(!settingsActuallyLoaded);
 
     if (!settingsActuallyLoaded) {
-      // Only apply OS theme if no settings loaded from anywhere
       const wantLightMode = window.matchMedia("(prefers-color-scheme: light)");
       if (wantLightMode.matches) {
         this.lightmode = true;
@@ -1049,14 +1061,10 @@ let colors = new Vue({
     }, 1600);
 
     if (this.animateBackgroundIntro && !settingsActuallyLoaded) {
-      // Only animate intro if not loading from settings
       setTimeout(() => {
         this.hasBackground = true;
       }, 2000);
     } else if (settingsActuallyLoaded && this.hasBackground) {
-      // If settings were loaded and hasBackground is true, ensure it's set.
-      // This should already be handled by loadSettingsFromLocalStorage or settingsFromURL.
-      // No specific action needed here as the property is already set.
     }
   },
 });
