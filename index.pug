@@ -134,6 +134,13 @@ html(lang="en-US")
           .panel__inputs
             input(type="range", v-model.number="minHueDistance", min="1", :max="360/colorsInGradient", step="1")
 
+        label.panel__setting
+          h4.panel__settingtitle
+            span Base Color Random Seed
+            input(type="number", v-model.number="currentSeed", min="1", step="1")
+          .panel__inputs
+            input(type="range", v-model.number="currentSeed", min="1", max="2147483647", step="1")
+
         label.panel__setting.panel__setting--checkbox.panel__setting--inline(title="WCAG 2.0 AA Contrasts")
           input(type="checkbox", v-model="showContrast")
           i.panel__checkbox

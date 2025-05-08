@@ -189,6 +189,7 @@ let colors = new Vue({
         { key: "f", prop: "generatorFunction" }, // 'Legacy'
         { key: "c", prop: "colorMode" }, // 'hsluv'
         { key: "qm", prop: "quantizationMethod" }, // art-palette,
+        { key: "ro", prop: "randomOrder", p: Boolean }, // false
       ],
       trackInLocalStorage: [
         { key: "a", prop: "amount", p: parseInt }, //6
@@ -214,6 +215,7 @@ let colors = new Vue({
         { key: "qm", prop: "quantizationMethod" }, // art-palette,
         { key: "nl", prop: "nameList" }, // nameList,
         { key: "ts", prop: "trackSettingsInURL", p: Boolean }, // false
+        { key: "ro", prop: "randomOrder", p: Boolean }, // false
       ],
       ...defaultSettings,
     };
@@ -255,6 +257,11 @@ let colors = new Vue({
     },
     randomOrder: function () {
       this.newColors();
+    },
+    currentSeed: function () {
+      if (this.randomOrder) {
+        this.newColors(false);
+      }
     },
     minHueDistance: function () {
       this.newColors();
